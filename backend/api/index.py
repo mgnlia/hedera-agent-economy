@@ -1,27 +1,20 @@
 """
-Hedera Agent Economy — Vercel Serverless Entry Point
-Simplified stateless API for demo/hackathon deployment.
+Hedera Agent Economy — Vercel Serverless Backend
+Stateless REST API with mock Hedera HCS simulation.
 """
-import sys
-import os
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import hashlib
+import os
+import time
+import uuid
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Any
-import time
-import uuid
-import random
-from datetime import datetime
+from mangum import Mangum
+from pydantic import BaseModel, Field
 
-app = FastAPI(
-    title="Hedera Agent Economy API",
-    version="1.0.0",
-    description="Multi-agent coordination layer using Hedera Consensus Service"
-)
+app = FastAPI(title="Hedera Agent Economy API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,163 +23,180 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-HEDERA_ACCOUNT_ID = os.getenv("HEDERA_ACCOUNT_ID", "0.0.5483526")
-HEDERA_NETWORK = os.getenv("HEDERA_NETWORK", "testnet")
+# ── Mock state ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-# Mock agent registry
-AGENTS = [
-    {"agent_id": "registry-001", "agent_type": "registry", "name": "Registry Agent", "status": "idle", "skills": ["register", "discover", "list"], "tasks_completed": 0, "hbar_earned": 0.0},
-    {"agent_id": "broker-001", "agent_type": "broker", "name": "Broker Agent", "status": "idle", "skills": ["match", "assign", "route"], "tasks_completed": 0, "hbar_earned": 0.0},
-    {"agent_id": "settlement-001", "agent_type": "settlement", "name": "Settlement Agent", "status": "idle", "skills": ["pay", "verify", "escrow"], "tasks_completed": 0, "hbar_earned": 0.0},
-    {"agent_id": "worker-summarizer", "agent_type": "worker", "name": "Summarizer Worker", "status": "idle", "skills": ["summarize", "tldr", "abstract"], "tasks_completed": 12, "hbar_earned": 6.0},
-    {"agent_id": "worker-reviewer", "agent_type": "worker", "name": "Code Reviewer Worker", "status": "idle", "skills": ["review", "lint", "security-scan"], "tasks_completed": 8, "hbar_earned": 8.0},
-    {"agent_id": "worker-analyst", "agent_type": "worker", "name": "Data Analyst Worker", "status": "idle", "skills": ["analyze", "stats", "chart"], "tasks_completed": 15, "hbar_earned": 11.25},
-]
-
-MOCK_MESSAGES = [
-    {"type": "AGENT_REGISTER", "agent": "Registry Agent", "topic": "registry", "timestamp": "2026-02-24T10:00:01Z"},
-    {"type": "AGENT_REGISTER", "agent": "Broker Agent", "topic": "registry", "timestamp": "2026-02-24T10:00:02Z"},
-    {"type": "AGENT_REGISTER", "agent": "Summarizer Worker", "topic": "registry", "timestamp": "2026-02-24T10:00:03Z"},
-    {"type": "TASK_REQUEST", "task_type": "summarize", "budget_hbar": 0.5, "topic": "tasks", "timestamp": "2026-02-24T10:01:00Z"},
-    {"type": "TASK_ASSIGN", "worker": "worker-summarizer", "task_type": "summarize", "topic": "tasks", "timestamp": "2026-02-24T10:01:01Z"},
-    {"type": "TASK_RESULT", "worker": "worker-summarizer", "cost_hbar": 0.4, "status": "success", "topic": "results", "timestamp": "2026-02-24T10:01:05Z"},
-    {"type": "PAYMENT_SETTLED", "amount_hbar": 0.4, "from": "requester", "to": "worker-summarizer", "topic": "payments", "timestamp": "2026-02-24T10:01:06Z"},
-]
-
-MOCK_TRANSACTIONS = [
-    {"tx_id": "0.0.5483526@1708768800.000001", "type": "PAYMENT", "amount_hbar": 0.4, "from": "0.0.requester", "to": "0.0.worker-1", "status": "SUCCESS", "timestamp": "2026-02-24T10:01:06Z"},
-    {"tx_id": "0.0.5483526@1708768860.000002", "type": "PAYMENT", "amount_hbar": 1.0, "from": "0.0.requester", "to": "0.0.worker-2", "status": "SUCCESS", "timestamp": "2026-02-24T10:02:06Z"},
-    {"tx_id": "0.0.5483526@1708768920.000003", "type": "PAYMENT", "amount_hbar": 0.75, "from": "0.0.requester", "to": "0.0.worker-3", "status": "SUCCESS", "timestamp": "2026-02-24T10:03:06Z"},
+MOCK_AGENTS = [
+    {"agent_id": "registry-001", "agent_type": "registry", "name": "Registry Agent",
+     "skills": ["register", "discover"], "hbar_balance": 50.0, "tasks_completed": 142,
+     "earnings_hbar": 0.0, "status": "idle"},
+    {"agent_id": "broker-001", "agent_type": "broker", "name": "Broker Agent",
+     "skills": ["match", "assign", "route"], "hbar_balance": 25.0, "tasks_completed": 98,
+     "earnings_hbar": 0.0, "status": "idle"},
+    {"agent_id": "worker-summarizer", "agent_type": "worker", "name": "Summarizer Agent",
+     "skills": ["summarize", "tldr", "abstract"], "hbar_balance": 18.5, "tasks_completed": 67,
+     "earnings_hbar": 33.5, "status": "idle"},
+    {"agent_id": "worker-reviewer", "agent_type": "worker", "name": "Code Reviewer Agent",
+     "skills": ["review", "lint", "security-scan"], "hbar_balance": 22.1, "tasks_completed": 54,
+     "earnings_hbar": 27.0, "status": "idle"},
+    {"agent_id": "worker-analyst", "agent_type": "worker", "name": "Data Analyst Agent",
+     "skills": ["analyze", "stats", "chart"], "hbar_balance": 15.8, "tasks_completed": 41,
+     "earnings_hbar": 20.5, "status": "idle"},
+    {"agent_id": "settlement-001", "agent_type": "settlement", "name": "Settlement Agent",
+     "skills": ["settle", "pay", "transfer"], "hbar_balance": 100.0, "tasks_completed": 162,
+     "earnings_hbar": 0.0, "status": "idle"},
 ]
 
 MOCK_TOPICS = {
-    "registry": "0.0.4891234",
-    "tasks": "0.0.4891235",
-    "results": "0.0.4891236",
-    "payments": "0.0.4891237",
+    "registry": "0.0.4821901",
+    "tasks": "0.0.4821902",
+    "results": "0.0.4821903",
+    "payments": "0.0.4821904",
 }
 
 
+def mock_messages(limit: int = 20) -> list:
+    now = time.time()
+    types = ["REGISTER", "TASK_REQUEST", "TASK_ASSIGN", "TASK_RESULT", "PAYMENT", "HEARTBEAT"]
+    agents = ["registry-001", "broker-001", "worker-summarizer", "worker-reviewer", "worker-analyst"]
+    topics = ["registry", "tasks", "results", "payments"]
+    msgs = []
+    for i in range(min(limit, 20)):
+        t = now - (i * 12)
+        msgs.append({
+            "id": hashlib.md5(f"{t}{i}".encode()).hexdigest()[:8],
+            "topic": topics[i % len(topics)],
+            "sender": agents[i % len(agents)],
+            "message_type": types[i % len(types)],
+            "payload": {"seq": i, "ts": t},
+            "sequence_number": 200 - i,
+            "consensus_timestamp": datetime.utcfromtimestamp(t).isoformat(),
+            "tx_id": f"0.0.5483526@{int(t)}.{i:06d}",
+        })
+    return msgs
+
+
+def mock_transactions(limit: int = 10) -> list:
+    now = time.time()
+    task_types = ["summarize", "review", "analyze"]
+    workers = ["worker-summarizer", "worker-reviewer", "worker-analyst"]
+    txns = []
+    for i in range(min(limit, 10)):
+        t = now - (i * 45)
+        txns.append({
+            "task_id": hashlib.md5(f"task{t}{i}".encode()).hexdigest()[:12],
+            "task_type": task_types[i % 3],
+            "worker_id": workers[i % 3],
+            "cost_hbar": round(0.3 + (i % 5) * 0.15, 2),
+            "duration_ms": 400 + (i * 87) % 600,
+            "status": "completed",
+            "completed_at": datetime.utcfromtimestamp(t).isoformat(),
+            "tx_id": f"0.0.5483526@{int(t)}.settle",
+        })
+    return txns
+
+
+# ── Models ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
 class TaskRequest(BaseModel):
+    task_id: str = Field(default_factory=lambda: str(uuid.uuid4())[:12])
     task_type: str
     payload: str
     budget_hbar: float = 0.5
-    requester: str = "api-user"
+    requester: str = "user"
 
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
-def health():
+async def health():
     return {
         "status": "ok",
-        "agents": len(AGENTS),
-        "network": HEDERA_NETWORK,
-        "account_id": HEDERA_ACCOUNT_ID,
+        "agents": len(MOCK_AGENTS),
+        "network": "testnet",
+        "mock_mode": True,
         "topics": MOCK_TOPICS,
         "timestamp": datetime.utcnow().isoformat(),
     }
 
 
 @app.get("/state")
-def get_state():
+async def get_state():
     return {
-        "agents": AGENTS,
-        "agent_count": len(AGENTS),
-        "messages": MOCK_MESSAGES,
-        "transactions": MOCK_TRANSACTIONS,
-        "topics": MOCK_TOPICS,
-        "total_hbar_settled": sum(t["amount_hbar"] for t in MOCK_TRANSACTIONS),
-        "network": HEDERA_NETWORK,
-        "account_id": HEDERA_ACCOUNT_ID,
-        "mock_mode": not bool(os.getenv("HEDERA_PRIVATE_KEY")),
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-
-
-@app.post("/task")
-def submit_task(req: TaskRequest):
-    task_id = str(uuid.uuid4())[:8]
-    
-    # Find a capable worker
-    workers = [a for a in AGENTS if a["agent_type"] == "worker"]
-    matched = next(
-        (w for w in workers if any(s in req.task_type for s in w["skills"])),
-        workers[0] if workers else None
-    )
-    
-    cost = round(req.budget_hbar * 0.8, 4)
-    duration_ms = 450
-    
-    task_results = {
-        "summarize": f"Summary: The provided content discusses key concepts and delivers actionable insights. Main points: (1) Core functionality is well-defined, (2) Implementation follows best practices, (3) Further optimization opportunities exist. [Task {task_id}]",
-        "review": f"Code Review: No critical security vulnerabilities found. Minor issues: (1) Missing input validation on line 42, (2) Consider extracting helper function for reuse, (3) Add error handling for edge cases. Recommendation: Approve with minor changes. [Task {task_id}]",
-        "analyze": f"Analysis: Dataset shows positive trend with 23% growth over the period. Key metrics: Mean=156.2, Std Dev=28.4, Trend=+2.3/period. Anomaly detected at index 4 — likely organic spike. Confidence: 94%. [Task {task_id}]",
-    }
-    
-    result_text = task_results.get(
-        req.task_type,
-        f"Task completed successfully. Processed: '{req.payload[:80]}' — Analysis complete with high confidence. [Task {task_id}]"
-    )
-    
-    tx_id = f"0.0.5483526@{int(time.time())}.{task_id}"
-    
-    return {
-        "task_id": task_id,
-        "status": "success",
-        "worker_id": matched["agent_id"] if matched else "worker-analyst",
-        "worker_name": matched["name"] if matched else "Data Analyst Worker",
-        "task_type": req.task_type,
-        "result": result_text,
-        "cost_hbar": cost,
-        "duration_ms": duration_ms,
-        "hcs_tx_id": tx_id,
-        "topic_id": MOCK_TOPICS.get("results", "0.0.4891236"),
-        "settled": True,
-        "network": HEDERA_NETWORK,
+        "agents": MOCK_AGENTS,
+        "messages": mock_messages(20),
+        "transactions": mock_transactions(10),
+        "stats": {
+            "tasks_completed": 362,
+            "total_hbar_settled": 81.0,
+            "active_agents": len(MOCK_AGENTS),
+            "total_agents": len(MOCK_AGENTS),
+            "topics": MOCK_TOPICS,
+        },
         "timestamp": datetime.utcnow().isoformat(),
     }
 
 
 @app.get("/agents")
-def list_agents():
-    return {
-        "agents": AGENTS,
-        "count": len(AGENTS),
-    }
+async def list_agents():
+    return {"agents": MOCK_AGENTS, "count": len(MOCK_AGENTS)}
 
 
 @app.get("/messages")
-def get_messages(limit: int = 50):
-    msgs = MOCK_MESSAGES[-limit:]
-    return {"messages": msgs, "total": len(MOCK_MESSAGES)}
+async def get_messages(limit: int = 50):
+    msgs = mock_messages(min(limit, 50))
+    return {"messages": msgs, "total": len(msgs)}
 
 
 @app.get("/transactions")
-def get_transactions(limit: int = 20):
-    txns = MOCK_TRANSACTIONS[-limit:]
-    return {"transactions": txns, "total": len(MOCK_TRANSACTIONS)}
+async def get_transactions(limit: int = 20):
+    txns = mock_transactions(min(limit, 20))
+    return {"transactions": txns, "total": len(txns)}
+
+
+@app.post("/task")
+async def submit_task(req: TaskRequest):
+    task_map = {
+        "summarize": "worker-summarizer",
+        "review": "worker-reviewer",
+        "analyze": "worker-analyst",
+    }
+    worker_id = task_map.get(req.task_type, "worker-analyst")
+    cost = round(req.budget_hbar * 0.8, 4)
+    duration = 450 + abs(hash(req.payload)) % 500
+
+    result_templates = {
+        "summarize": f"Summary: Key points extracted from '{req.payload[:60]}' — multi-agent coordination enables trustless task delegation with HBAR micropayments settled via HCS.",
+        "review": f"Code Review: Analyzed '{req.payload[:60]}' — No critical vulnerabilities found. Recommend input validation on boundary conditions. Gas optimization possible in iteration loops.",
+        "analyze": f"Analysis: Processed '{req.payload[:60]}' — Trend shows 23% growth. Peak activity detected at index 4. Recommend scaling infrastructure for projected 40% increase.",
+    }
+    result_text = result_templates.get(req.task_type, f"Task '{req.task_type}' completed successfully.")
+
+    return {
+        "task_id": req.task_id,
+        "worker_id": worker_id,
+        "task_type": req.task_type,
+        "result": result_text,
+        "cost_hbar": cost,
+        "duration_ms": duration,
+        "completed_at": datetime.utcnow().isoformat(),
+        "tx_id": f"0.0.5483526@{int(time.time())}.{req.task_id}",
+        "status": "completed",
+    }
 
 
 @app.post("/demo/run")
-def run_demo():
+async def run_demo():
     demo_tasks = [
         TaskRequest(task_type="summarize", payload="Summarize the Hedera whitepaper key points", budget_hbar=0.5),
         TaskRequest(task_type="review", payload="Review this Solidity contract for reentrancy vulnerabilities", budget_hbar=1.0),
         TaskRequest(task_type="analyze", payload="Analyze daily active users trend: [120,145,132,178,201]", budget_hbar=0.75),
     ]
-    
     results = []
-    for req in demo_tasks:
-        result = submit_task(req)
+    for task in demo_tasks:
+        result = await submit_task(task)
         results.append(result)
-    
-    return {
-        "demo": "complete",
-        "tasks_executed": len(results),
-        "total_hbar_spent": sum(r["cost_hbar"] for r in results),
-        "results": results,
-    }
+    return {"demo": "complete", "tasks_executed": len(results), "results": results}
 
 
-# Mangum adapter for Vercel serverless
-from mangum import Mangum
+# Vercel handler
 handler = Mangum(app, lifespan="off")
