@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0d0d1a;
+  --card: #13132b;
+  --border: #1e1e3f;
+  --hedera: #8259EF;
+}
+
+body {
+  background-color: var(--bg);
+  color: #e2e8f0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.card {
+  @apply rounded-2xl border border-[#1e1e3f] bg-[#13132b] p-5;
+}
+
+.badge {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+
+.btn-primary {
+  @apply rounded-xl bg-[#8259EF] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#7048d4] transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply rounded-xl border border-[#1e1e3f] bg-[#13132b] px-5 py-2.5 text-sm font-medium text-gray-300 hover:bg-[#1e1e3f] transition-colors;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: #2d2d5e; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #8259EF; }
+
+/* Pulse dot */
+.pulse-dot {
+  @apply w-2 h-2 rounded-full bg-green-400;
+  animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
