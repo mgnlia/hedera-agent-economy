@@ -9,7 +9,7 @@ import { TransactionLog } from "@/components/TransactionLog";
 import { EconomyChart } from "@/components/EconomyChart";
 import { HederaLogo } from "@/components/HederaLogo";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://hedera-agent-economy-production.up.railway.app";
+const API = process.env.NEXT_PUBLIC_API_URL || "https://hedera-vercel-backend.vercel.app";
 
 export interface Agent {
   agent_id: string;
