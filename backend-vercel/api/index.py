@@ -1,21 +1,23 @@
 """
 Hedera Agent Economy — Vercel Serverless Backend
 Simulates the multi-agent coordination layer on Hedera Consensus Service.
+
+API contract matches the frontend EconomySnapshot interface exactly.
 """
 import os
 import random
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 from pydantic import BaseModel
 
 app = FastAPI(
     title="Hedera Agent Economy API",
-    version="1.0.0",
+    version="2.0.0",
     description="Multi-agent coordination layer using Hedera Consensus Service",
 )
 
@@ -26,9 +28,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Simulated agent state ──────────────────────────────────────────────────
+# ── Simulated state ────────────────────────────────────────────────────────
 
-AGENTS = [
+AGENTS: list[dict] = [
     {
         "agent_id": "registry-001",
         "agent_type": "registry",
@@ -38,6 +40,7 @@ AGENTS = [
         "tasks_completed": 142,
         "earnings_hbar": 28.4,
         "status": "idle",
+        "registered_at": "2026-02-24T10:00:00Z",
     },
     {
         "agent_id": "broker-001",
@@ -48,6 +51,7 @@ AGENTS = [
         "tasks_completed": 138,
         "earnings_hbar": 55.1,
         "status": "busy",
+        "registered_at": "2026-02-24T10:00:00Z",
     },
     {
         "agent_id": "worker-summarizer",
@@ -58,6 +62,7 @@ AGENTS = [
         "tasks_completed": 89,
         "earnings_hbar": 44.5,
         "status": "idle",
+        "registered_at": "2026-02-24T10:00:00Z",
     },
     {
         "agent_id": "worker-code-reviewer",
@@ -68,6 +73,7 @@ AGENTS = [
         "tasks_completed": 67,
         "earnings_hbar": 67.0,
         "status": "idle",
+        "registered_at": "2026-02-24T10:00:00Z",
     },
     {
         "agent_id": "worker-data-analyst",
@@ -78,6 +84,7 @@ AGENTS = [
         "tasks_completed": 54,
         "earnings_hbar": 40.5,
         "status": "busy",
+        "registered_at": "2026-02-24T10:00:00Z",
     },
     {
         "agent_id": "settlement-001",
@@ -88,6 +95,7 @@ AGENTS = [
         "tasks_completed": 308,
         "earnings_hbar": 15.4,
         "status": "idle",
+        "registered_at": "2026-02-24T10:00:00Z",
     },
 ]
 
@@ -98,8 +106,8 @@ MESSAGES: list[dict] = [
         "sender": "registry-001",
         "message_type": "agent_registered",
         "payload": {"agent_id": "worker-summarizer", "skills": ["summarize", "tldr"]},
-        "timestamp": "2026-02-24T10:00:00Z",
-        "hcs_sequence": 1001,
+        "consensus_timestamp": "2026-02-24T10:00:00Z",
+        "tx_id": "0.0.5483526@1708765200.000000000",
     },
     {
         "id": "msg-002",
@@ -107,8 +115,8 @@ MESSAGES: list[dict] = [
         "sender": "broker-001",
         "message_type": "task_assigned",
         "payload": {"task_id": "task-abc", "worker": "worker-summarizer", "budget_hbar": 0.5},
-        "timestamp": "2026-02-24T10:01:00Z",
-        "hcs_sequence": 1002,
+        "consensus_timestamp": "2026-02-24T10:01:00Z",
+        "tx_id": "0.0.5483526@1708765260.000000000",
     },
     {
         "id": "msg-003",
@@ -116,41 +124,74 @@ MESSAGES: list[dict] = [
         "sender": "settlement-001",
         "message_type": "payment_settled",
         "payload": {"task_id": "task-abc", "amount_hbar": 0.5, "tx_id": "0.0.5483526@1708765200.000000000"},
-        "timestamp": "2026-02-24T10:02:00Z",
-        "hcs_sequence": 1003,
+        "consensus_timestamp": "2026-02-24T10:02:00Z",
+        "tx_id": "0.0.5483526@1708765320.000000000",
     },
 ]
 
 TRANSACTIONS: list[dict] = [
     {
-        "tx_id": "0.0.5483526@1708765200.000000000",
-        "from_agent": "broker-001",
-        "to_agent": "worker-summarizer",
-        "amount_hbar": 0.5,
         "task_id": "task-abc",
-        "status": "confirmed",
-        "timestamp": "2026-02-24T10:02:00Z",
+        "worker_id": "worker-summarizer",
+        "amount_hbar": 0.5,
+        "tx_id": "0.0.5483526@1708765200.000000000",
+        "duration_ms": 312,
+        "timestamp": 1708765200,
+        "mock": True,
     },
     {
-        "tx_id": "0.0.5483526@1708765260.000000000",
-        "from_agent": "broker-001",
-        "to_agent": "worker-code-reviewer",
-        "amount_hbar": 1.0,
         "task_id": "task-def",
-        "status": "confirmed",
-        "timestamp": "2026-02-24T10:05:00Z",
+        "worker_id": "worker-code-reviewer",
+        "amount_hbar": 1.0,
+        "tx_id": "0.0.5483526@1708765260.000000000",
+        "duration_ms": 428,
+        "timestamp": 1708765260,
+        "mock": True,
     },
     {
-        "tx_id": "0.0.5483526@1708765320.000000000",
-        "from_agent": "broker-001",
-        "to_agent": "worker-data-analyst",
-        "amount_hbar": 0.75,
         "task_id": "task-ghi",
-        "status": "confirmed",
-        "timestamp": "2026-02-24T10:08:00Z",
+        "worker_id": "worker-data-analyst",
+        "amount_hbar": 0.75,
+        "tx_id": "0.0.5483526@1708765320.000000000",
+        "duration_ms": 389,
+        "timestamp": 1708765320,
+        "mock": True,
     },
 ]
 
+# Cumulative counters (seeded with pre-existing demo data)
+_tasks_completed = sum(a["tasks_completed"] for a in AGENTS)
+_total_hbar_settled = sum(t["amount_hbar"] for t in TRANSACTIONS)
+
+HCS_TOPICS = {
+    "agent-registry": "0.0.5483527",
+    "task-negotiation": "0.0.5483528",
+    "settlement": "0.0.5483529",
+}
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _economy_snapshot() -> dict:
+    active = sum(1 for a in AGENTS if a["status"] == "busy")
+    return {
+        "agents": AGENTS,
+        "messages": MESSAGES[-50:],
+        "transactions": TRANSACTIONS[-20:],
+        "stats": {
+            "tasks_completed": _tasks_completed,
+            "total_hbar_settled": round(_total_hbar_settled, 4),
+            "active_agents": active,
+            "total_agents": len(AGENTS),
+            "topics": HCS_TOPICS,
+        },
+        "timestamp": _now(),
+    }
+
+
+# ── Models ─────────────────────────────────────────────────────────────────
 
 class TaskRequest(BaseModel):
     task_type: str
@@ -160,29 +201,23 @@ class TaskRequest(BaseModel):
 
 # ── Routes ─────────────────────────────────────────────────────────────────
 
-
 @app.get("/health")
 def health():
     return {
         "status": "ok",
-        "agents": len(AGENTS),
-        "network": os.getenv("HEDERA_NETWORK", "testnet"),
-        "account_id": os.getenv("HEDERA_ACCOUNT_ID", "0.0.5483526"),
-        "timestamp": datetime.utcnow().isoformat(),
+        "hedera_network": os.getenv("HEDERA_NETWORK", "testnet"),
+        "topic_id": "0.0.demo",
+        "agents_registered": len(AGENTS),
+        "demo_mode": True,
+        "ai_enabled": False,
+        "timestamp": _now(),
     }
 
 
 @app.get("/state")
 def get_state():
-    return {
-        "agents": AGENTS,
-        "agent_count": len(AGENTS),
-        "message_count": len(MESSAGES),
-        "transaction_count": len(TRANSACTIONS),
-        "total_hbar_settled": sum(t["amount_hbar"] for t in TRANSACTIONS),
-        "network": os.getenv("HEDERA_NETWORK", "testnet"),
-        "timestamp": datetime.utcnow().isoformat(),
-    }
+    """Return full EconomySnapshot — primary endpoint polled by the frontend."""
+    return _economy_snapshot()
 
 
 @app.get("/agents")
@@ -202,12 +237,38 @@ def get_transactions(limit: int = 20):
     return {"transactions": txns, "total": len(TRANSACTIONS)}
 
 
+# Legacy routes kept for backwards compat
+@app.get("/stats")
+def get_stats():
+    snap = _economy_snapshot()
+    s = snap["stats"]
+    return {
+        "total_agents": s["total_agents"],
+        "total_tasks": s["tasks_completed"],
+        "completed_tasks": s["tasks_completed"],
+        "pending_tasks": 0,
+        "failed_tasks": 0,
+        "total_hbar_settled": s["total_hbar_settled"],
+        "hcs_messages": len(MESSAGES),
+        "topic_id": "0.0.demo",
+        "demo_mode": True,
+    }
+
+
+@app.get("/feed")
+def get_feed(limit: int = 50):
+    return {"messages": MESSAGES[-limit:], "topic_id": "0.0.demo", "count": len(MESSAGES)}
+
+
 @app.post("/task")
+@app.post("/tasks/submit")
 def submit_task(req: TaskRequest):
     """Submit a task to the broker for agent matching and execution."""
-    task_id = f"task-{str(uuid.uuid4())[:8]}"
+    global _tasks_completed, _total_hbar_settled
 
-    # Find matching worker
+    task_id = f"task-{str(uuid.uuid4())[:8]}"
+    start_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+
     skill_map = {
         "summarize": "worker-summarizer",
         "tldr": "worker-summarizer",
@@ -219,64 +280,73 @@ def submit_task(req: TaskRequest):
         "stats": "worker-data-analyst",
         "chart": "worker-data-analyst",
     }
-    assigned_worker = skill_map.get(req.task_type, "worker-summarizer")
+    assigned_worker_id = skill_map.get(req.task_type, "worker-summarizer")
+    worker = next((a for a in AGENTS if a["agent_id"] == assigned_worker_id), AGENTS[2])
 
-    worker = next((a for a in AGENTS if a["agent_id"] == assigned_worker), AGENTS[2])
-
-    # Simulate result
     result_map = {
-        "summarize": f"Summary: {req.payload[:100]}... [AI condensed to 3 key points]",
-        "review": f"Code Review: Found 0 critical issues. 2 style suggestions for: {req.payload[:80]}",
-        "analyze": f"Analysis: Dataset shows upward trend. Mean: {random.randint(100, 500)}, Std: {random.randint(10, 50)}",
+        "summarize": f"Summary: {req.payload[:120]}… [AI condensed to 3 key points via HCS-verified consensus]",
+        "review": f"Code Review: 0 critical issues detected. 2 style suggestions. Reentrancy pattern flagged for: {req.payload[:80]}",
+        "analyze": f"Analysis complete: Dataset shows upward trend. Mean={random.randint(100, 500)}, σ={random.randint(10, 50)}. Confidence: 94%",
     }
     result_text = result_map.get(req.task_type, f"Task completed: {req.payload[:100]}")
 
-    tx_id = f"0.0.5483526@{int(datetime.utcnow().timestamp())}.000000000"
+    ts = int(datetime.now(timezone.utc).timestamp())
+    tx_id = f"0.0.5483526@{ts}.000000000"
+    duration_ms = random.randint(280, 650)
 
-    new_tx = {
-        "tx_id": tx_id,
-        "from_agent": "broker-001",
-        "to_agent": assigned_worker,
-        "amount_hbar": req.budget_hbar,
+    # Update global state
+    _tasks_completed += 1
+    _total_hbar_settled = round(_total_hbar_settled + req.budget_hbar, 4)
+    worker["tasks_completed"] += 1
+    worker["earnings_hbar"] = round(worker["earnings_hbar"] + req.budget_hbar, 4)
+
+    TRANSACTIONS.append({
         "task_id": task_id,
-        "status": "confirmed",
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-    TRANSACTIONS.append(new_tx)
+        "worker_id": assigned_worker_id,
+        "amount_hbar": req.budget_hbar,
+        "tx_id": tx_id,
+        "duration_ms": duration_ms,
+        "timestamp": ts,
+        "mock": True,
+    })
 
-    new_msg = {
+    MESSAGES.append({
         "id": f"msg-{str(uuid.uuid4())[:6]}",
         "topic": "task-negotiation",
         "sender": "broker-001",
         "message_type": "task_completed",
-        "payload": {"task_id": task_id, "worker": assigned_worker, "result": result_text[:80]},
-        "timestamp": datetime.utcnow().isoformat(),
-        "hcs_sequence": 1000 + len(MESSAGES) + 1,
-    }
-    MESSAGES.append(new_msg)
+        "payload": {"task_id": task_id, "worker": assigned_worker_id, "result": result_text[:80]},
+        "consensus_timestamp": datetime.now(timezone.utc).isoformat(),
+        "tx_id": tx_id,
+    })
 
     return {
         "task_id": task_id,
         "status": "completed",
-        "assigned_to": worker["name"],
         "result": result_text,
-        "hbar_paid": req.budget_hbar,
+        "cost_hbar": req.budget_hbar,
+        "duration_ms": duration_ms,
+        "assigned_to": worker["name"],
         "tx_id": tx_id,
-        "hcs_sequence": new_msg["hcs_sequence"],
+        "hcs_sequence": 1000 + len(MESSAGES),
     }
 
 
 @app.post("/demo/run")
 def run_demo():
-    """Trigger a full demo cycle."""
+    """Trigger a full demo cycle — 3 tasks across all worker types."""
     demo_tasks = [
-        TaskRequest(task_type="summarize", payload="Summarize the Hedera whitepaper key points", budget_hbar=0.5),
+        TaskRequest(task_type="summarize", payload="Summarize the Hedera whitepaper key points on hashgraph consensus", budget_hbar=0.5),
         TaskRequest(task_type="review", payload="Review this Solidity contract for reentrancy vulnerabilities", budget_hbar=1.0),
-        TaskRequest(task_type="analyze", payload="Analyze daily active users trend: [120,145,132,178,201]", budget_hbar=0.75),
+        TaskRequest(task_type="analyze", payload="Analyze daily active users trend: [120,145,132,178,201,189,224]", budget_hbar=0.75),
     ]
-
     results = [submit_task(task) for task in demo_tasks]
-    return {"demo": "complete", "tasks_executed": len(results), "results": results}
+    return {
+        "demo": "complete",
+        "tasks_executed": len(results),
+        "total_hbar_spent": sum(r["cost_hbar"] for r in results),
+        "results": results,
+    }
 
 
 handler = Mangum(app, lifespan="off")
