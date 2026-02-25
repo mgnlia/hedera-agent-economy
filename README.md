@@ -5,8 +5,18 @@
 Built for the [Hedera Hello Future Apex Hackathon 2026](https://hackathon.stackup.dev/web/events/hedera-hello-future-apex-hackathon-2026) — **AI & Agents Track** ($48K prize pool).
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-black?logo=vercel)](https://hedera-agent-economy.vercel.app)
-[![Backend](https://img.shields.io/badge/Backend-Railway-purple)](https://hedera-agent-economy-production.up.railway.app)
+[![Backend](https://img.shields.io/badge/Backend_API-Vercel-black?logo=vercel)](https://hedera-vercel-backend.vercel.app/health)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+---
+
+## 🔗 Live URLs
+
+| Service | URL | Status |
+|---------|-----|--------|
+| **Frontend Dashboard** | https://hedera-agent-economy.vercel.app | ✅ Live |
+| **Backend API** | https://hedera-vercel-backend.vercel.app/health | ✅ Live |
+| **API Docs (Swagger)** | https://hedera-vercel-backend.vercel.app/docs | ✅ Live |
 
 ---
 
@@ -52,7 +62,7 @@ Built for the [Hedera Hello Future Apex Hackathon 2026](https://hackathon.stacku
 | **Agent Discovery** | Registry agent broadcasts capabilities; broker matches tasks to workers |
 | **AI Task Execution** | Workers use Claude AI for summarization, code review, and data analysis |
 | **HBAR Settlement** | Automatic micropayment settlement after every completed task |
-| **Live Dashboard** | Real-time WebSocket feed of HCS messages, agent status, and transaction log |
+| **Live Dashboard** | Real-time feed of HCS messages, agent status, and transaction log |
 | **Testnet Ready** | Full end-to-end on Hedera testnet — no real money required |
 
 ## 🚀 Quick Start
@@ -108,18 +118,16 @@ Triggers HBAR micropayment via Hedera Token Service after every `TASK_RESULT` me
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/state` | GET | Full economy snapshot |
 | `/agents` | GET | List all agents |
 | `/task` | POST | Submit a task |
 | `/messages` | GET | HCS message history |
 | `/transactions` | GET | Settlement history |
 | `/demo/run` | POST | Run full demo cycle |
-| `/ws` | WS | Live state feed |
 
 ### Submit a Task
 
 ```bash
-curl -X POST https://hedera-agent-economy-production.up.railway.app/task \
+curl -X POST https://hedera-vercel-backend.vercel.app/task \
   -H "Content-Type: application/json" \
   -d '{
     "task_type": "summarize",
@@ -152,6 +160,8 @@ hedera-agent-economy/
 │   │   └── settlement.py    # SettlementAgent
 │   ├── pyproject.toml
 │   └── Dockerfile
+├── backend-vercel/
+│   └── api/index.py         # Vercel serverless deployment
 ├── frontend/
 │   ├── src/app/
 │   │   ├── page.tsx         # Main dashboard
@@ -163,6 +173,7 @@ hedera-agent-economy/
 │       ├── TaskSubmitter.tsx
 │       ├── TransactionLog.tsx
 │       └── EconomyChart.tsx
+├── PITCH_DECK.md            # Hackathon pitch deck
 ├── .env.example
 └── README.md
 ```
@@ -170,9 +181,10 @@ hedera-agent-economy/
 ## 🔗 Links
 
 - **Live Demo:** https://hedera-agent-economy.vercel.app
-- **API Docs:** https://hedera-agent-economy-production.up.railway.app/docs
+- **Backend API:** https://hedera-vercel-backend.vercel.app/health
+- **API Docs:** https://hedera-vercel-backend.vercel.app/docs
+- **Pitch Deck:** https://github.com/mgnlia/hedera-agent-economy/blob/main/PITCH_DECK.md
 - **Hedera Portal:** https://portal.hedera.com
-- **Mirror Node:** https://testnet.mirrornode.hedera.com
 
 ## 📄 License
 
