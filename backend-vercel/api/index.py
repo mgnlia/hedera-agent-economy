@@ -1,8 +1,9 @@
 """
-Hedera Agent Economy — Vercel Serverless Backend
+Hedera Agent Economy — Vercel Serverless Backend v2.0.1
 Simulates the multi-agent coordination layer on Hedera Consensus Service.
 
 API contract matches the frontend EconomySnapshot interface exactly.
+Routes: /health /state /agents /messages /transactions /demo/run /stats /feed /task /tasks/submit
 """
 import os
 import random
@@ -17,7 +18,7 @@ from pydantic import BaseModel
 
 app = FastAPI(
     title="Hedera Agent Economy API",
-    version="2.0.0",
+    version="2.0.1",
     description="Multi-agent coordination layer using Hedera Consensus Service",
 )
 
@@ -267,7 +268,6 @@ def submit_task(req: TaskRequest):
     global _tasks_completed, _total_hbar_settled
 
     task_id = f"task-{str(uuid.uuid4())[:8]}"
-    start_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
 
     skill_map = {
         "summarize": "worker-summarizer",
@@ -316,7 +316,7 @@ def submit_task(req: TaskRequest):
         "sender": "broker-001",
         "message_type": "task_completed",
         "payload": {"task_id": task_id, "worker": assigned_worker_id, "result": result_text[:80]},
-        "consensus_timestamp": datetime.now(timezone.utc).isoformat(),
+        "consensus_timestamp": _now(),
         "tx_id": tx_id,
     })
 
